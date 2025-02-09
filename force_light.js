@@ -50,29 +50,30 @@
         }
       } catch (e) {
         // cross-origin, CSP 등의 이유로 접근 불가하면 에러
-        console.error(e);
+        // console.error(e);
       }
     }
-  });    
-
-    // 3) 실제 body 관련 조작은 DOMContentLoaded 이후에
-    function removeDarkModeIfNeeded() {
-        const body = document.body;
-        if (!body) return;
-        // 이미 붙어있으면 제거
-        if (body.classList.contains("is-darkmode")) {
-          body.classList.remove("is-darkmode");
-        }
-      }  
-
-  document.addEventListener("DOMContentLoaded", removeDarkModeIfNeeded);
+  });
   
-  // 혹시 더 일찍 body가 생길 수 있으므로, 10ms 뒤에 한 번 더 확인
-  setTimeout(removeDarkModeIfNeeded, 10);
 
-  setTimeout(removeDarkModeIfNeeded, 1000);
+    // 2) 일정 간격으로 검사하는 interval
+    const intervalId = setInterval(removeDarkModeIfNeeded, 500); // 0.5초마다
 
-
+    function removeDarkModeIfNeeded() {
+      const body = document.body;
+      // 아직 body가 없으면 그냥 return
+      if (!body) return;
+  
+      if (body.classList.contains("is-darkmode")) {
+        // 붙어 있으면 제거
+        body.classList.remove("is-darkmode");
+        console.log("Removed 'is-darkmode' from body.");
+      } else {
+        // 이미 제거돼서 없는 상태라면, 더 이상 interval 돌 필요 없음
+        clearInterval(intervalId);
+        console.log("No 'is-darkmode' found. Stopping checks.");
+      }
+    }
   
   })();
   

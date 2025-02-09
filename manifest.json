@@ -1,5 +1,5 @@
 {
-    "name": "Theme Overrider",
+    "name": "Naver Dictionary Fix to Light Theme",
     "version": "1.0",
     "manifest_version": 3,
     "permissions": [
@@ -8,9 +8,7 @@
     ],
     "host_permissions": [
       "*://dict.naver.com/*",
-      "*://*.dict.naver.com/*",
-      "*://github.com/*",
-      "*://*.github.com/*"
+      "*://*.dict.naver.com/*"
     ],
     "background": {
       "service_worker": "background.js"

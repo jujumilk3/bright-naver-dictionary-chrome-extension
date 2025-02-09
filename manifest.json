@@ -2,12 +2,15 @@
     "name": "Theme Overrider",
     "version": "1.0",
     "manifest_version": 3,
-    "content_scripts": [
-      {
-        "matches": ["*://dict.naver.com/*"],
-        "js": ["content.js"],
-        "run_at": "document_start"
-      }
-    ]
+    "permissions": [
+      "webNavigation",
+      "scripting"
+    ],
+    "host_permissions": [
+      "*://dict.naver.com/*"
+    ],    
+    "background": {
+      "service_worker": "background.js"
+    }
   }
   

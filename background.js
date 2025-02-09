@@ -1,7 +1,4 @@
-console.log("background.js");
-
 chrome.webNavigation.onCommitted.addListener((details) => {
-    console.log("background.js: onCommitted", details);
     // frameId === 0 이면 최상위 프레임(메인문서)
     // 서브 프레임(iframe) 등은 무시
     if (details.frameId === 0 && details.url.includes("dict.naver.com")) {
@@ -16,9 +13,7 @@ chrome.webNavigation.onCommitted.addListener((details) => {
         injectImmediately: true
       }, () => {
         if (chrome.runtime.lastError) {
-          console.error("executeScript error:", chrome.runtime.lastError.message);
         } else {
-          console.log("[SW] force_light.js injected successfully");
         }
       });
     }
@@ -26,7 +21,6 @@ chrome.webNavigation.onCommitted.addListener((details) => {
   
 // background.js (service worker)
 chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
-    console.log("[SW] onHistoryStateUpdated fired:", details.url);
     
     if (details.frameId === 0 && details.url.includes("dict.naver.com")) {
       chrome.scripting.executeScript({
@@ -36,9 +30,7 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
         injectImmediately: true
       }, () => {
         if (chrome.runtime.lastError) {
-          console.error("executeScript error:", chrome.runtime.lastError.message);
         } else {
-          console.log("[SW] force_light.js injected again (historyStateUpdated)");
         }
       });
     }

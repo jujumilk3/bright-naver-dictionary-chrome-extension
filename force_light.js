@@ -29,5 +29,50 @@
     if (document.body?.classList.contains("is-darkmode")) {
       document.body.classList.remove("is-darkmode");
     }
+
+  // DOM이 준비된 뒤 실행(아직 스타일시트가 없다면 에러 날 수 있음)
+  document.addEventListener("DOMContentLoaded", () => {
+    const sheets = document.styleSheets;
+
+    for (const sheet of sheets) {
+      try {
+        // 각 styleSheet에 대해 cssRules를 순회
+        const rules = sheet.cssRules || sheet.rules;
+        for (let i = 0; i < rules.length; i++) {
+          const rule = rules[i];
+          console.log("[DEBUG] Rule type:", rule.type, rule.conditionText);
+          // MEDIA_RULE = 4
+          if (rule.type === CSSRule.MEDIA_RULE && rule.conditionText.includes('(prefers-color-scheme: dark)')) {
+            console.log("[DEBUG] Removing dark mode media rule:", rule.conditionText);
+            sheet.deleteRule(i);
+            i--;
+          }
+        }
+      } catch (e) {
+        // cross-origin, CSP 등의 이유로 접근 불가하면 에러
+        console.error(e);
+      }
+    }
+  });    
+
+    // 3) 실제 body 관련 조작은 DOMContentLoaded 이후에
+    function removeDarkModeIfNeeded() {
+        const body = document.body;
+        if (!body) return;
+        // 이미 붙어있으면 제거
+        if (body.classList.contains("is-darkmode")) {
+          body.classList.remove("is-darkmode");
+        }
+      }  
+
+  document.addEventListener("DOMContentLoaded", removeDarkModeIfNeeded);
+  
+  // 혹시 더 일찍 body가 생길 수 있으므로, 10ms 뒤에 한 번 더 확인
+  setTimeout(removeDarkModeIfNeeded, 10);
+
+  setTimeout(removeDarkModeIfNeeded, 1000);
+
+
+  
   })();
   

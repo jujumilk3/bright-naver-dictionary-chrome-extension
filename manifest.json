@@ -7,8 +7,11 @@
       "scripting"
     ],
     "host_permissions": [
-      "*://dict.naver.com/*"
-    ],    
+      "*://dict.naver.com/*",
+      "*://*.dict.naver.com/*",
+      "*://github.com/*",
+      "*://*.github.com/*"
+    ],
     "background": {
       "service_worker": "background.js"
     }

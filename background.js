@@ -24,3 +24,23 @@ chrome.webNavigation.onCommitted.addListener((details) => {
     }
   });
   
+// background.js (service worker)
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+    console.log("[SW] onHistoryStateUpdated fired:", details.url);
+    
+    if (details.frameId === 0 && details.url.includes("dict.naver.com")) {
+      chrome.scripting.executeScript({
+        target: { tabId: details.tabId },
+        files: ["force_light.js"],
+        world: "MAIN",
+        injectImmediately: true
+      }, () => {
+        if (chrome.runtime.lastError) {
+          console.error("executeScript error:", chrome.runtime.lastError.message);
+        } else {
+          console.log("[SW] force_light.js injected again (historyStateUpdated)");
+        }
+      });
+    }
+  });
+  

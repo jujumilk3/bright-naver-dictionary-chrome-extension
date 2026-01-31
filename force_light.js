@@ -1,70 +1,193 @@
 (function () {
-  // 1) matchMedia 오버라이드 (항상 false)
+  // 1) matchMedia 오버라이드 — matches를 getter로 확실히 고정
   const originalMatchMedia = window.matchMedia;
   window.matchMedia = function (query) {
-    const mqList = originalMatchMedia(query);
-    if (query.includes("(prefers-color-scheme: dark)")) {
-      mqList.matches = false;
+    const mqList = originalMatchMedia.call(window, query);
+    if (query.includes("prefers-color-scheme: dark")) {
+      try {
+        Object.defineProperty(mqList, "matches", {
+          get: () => false,
+          configurable: true,
+        });
+      } catch (_) {
+        mqList.matches = false;
+      }
+
+      const noop = () => {};
+      mqList.addListener = noop;
+      mqList.addEventListener = noop;
     }
     return mqList;
   };
 
-  // 2) body.classList.add('is-darkmode') 차단
+  // 2) body.classList.add / toggle / replace 에서 is-darkmode 차단
   const originalAdd = DOMTokenList.prototype.add;
   DOMTokenList.prototype.add = function (...tokens) {
-    // body가 아직 없을 수도 있으므로 체크
-    if (this === document.body?.classList && tokens.includes("is-darkmode")) {
-      // "is-darkmode" 제거
-      tokens = tokens.filter((token) => token !== "is-darkmode");
+    if (this === document.body?.classList) {
+      tokens = tokens.filter((t) => t !== "is-darkmode");
+      if (tokens.length === 0) return;
     }
     return originalAdd.apply(this, tokens);
   };
 
-  // 3) 혹시 이미 붙었으면 제거 (인라인 스크립트가 더 빨랐을 경우 대비)
-  //    body가 아직 없으면 null이므로 optional chaining
-  if (document.body?.classList.contains("is-darkmode")) {
-    document.body.classList.remove("is-darkmode");
+  const originalToggle = DOMTokenList.prototype.toggle;
+  DOMTokenList.prototype.toggle = function (token, force) {
+    if (this === document.body?.classList && token === "is-darkmode") {
+      if (this.contains("is-darkmode")) this.remove("is-darkmode");
+      return false;
+    }
+    return originalToggle.call(this, token, force);
+  };
+
+  // 3) body.className 직접 할당 감시
+  const bodyDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    "className"
+  );
+  if (bodyDescriptor) {
+    Object.defineProperty(HTMLElement.prototype, "className", {
+      set(value) {
+        if (this === document.body && typeof value === "string") {
+          value = value
+            .split(/\s+/)
+            .filter((c) => c !== "is-darkmode")
+            .join(" ");
+        }
+        bodyDescriptor.set.call(this, value);
+      },
+      get() {
+        return bodyDescriptor.get.call(this);
+      },
+      configurable: true,
+    });
   }
 
-  // 4) DOM이 준비된 뒤 실행(아직 스타일시트가 없다면 에러 날 수 있음)
-  document.addEventListener("DOMContentLoaded", () => {
-    const sheets = document.styleSheets;
+  // 4) color-scheme 강제 light 주입
+  function injectLightColorScheme() {
+    if (document.getElementById("__force_light_cs")) return;
+    const style = document.createElement("style");
+    style.id = "__force_light_cs";
+    style.textContent =
+      ":root, html, body { color-scheme: light !important; }";
+    (document.head || document.documentElement).appendChild(style);
+  }
 
-    for (const sheet of sheets) {
+  // 5) <meta name="color-scheme"> dark 제거
+  function sanitizeColorSchemeMeta() {
+    document
+      .querySelectorAll('meta[name="color-scheme"]')
+      .forEach((meta) => {
+        const content = meta.getAttribute("content") || "";
+        if (content.includes("dark")) {
+          meta.setAttribute("content", "light");
+        }
+      });
+  }
+
+  // 6) 다크모드 CSS 미디어룰 제거 — 모든 스타일시트 대상
+  function deleteDarkMediaRules() {
+    for (const sheet of document.styleSheets) {
       try {
-        // 각 styleSheet에 대해 cssRules를 순회
         const rules = sheet.cssRules || sheet.rules;
-        for (let i = 0; i < rules.length; i++) {
+        if (!rules) continue;
+        for (let i = rules.length - 1; i >= 0; i--) {
           const rule = rules[i];
           if (
             rule.type === CSSRule.MEDIA_RULE &&
-            rule.conditionText.includes("(prefers-color-scheme: dark)")
+            rule.conditionText?.includes("prefers-color-scheme: dark")
           ) {
             sheet.deleteRule(i);
-            i--;
           }
         }
-      } catch (e) {
-        // cross-origin, CSP 등의 이유로 접근 불가하면 에러
-        // console.error(e);
+      } catch (_) {
+        // cross-origin / CSP
       }
     }
-  });
+  }
 
-  // 5) 일정 간격으로 검사하는 interval
-  const intervalId = setInterval(removeDarkModeIfNeeded, 500); // 0.5초마다
-
-  function removeDarkModeIfNeeded() {
+  // 7) body에서 is-darkmode 제거 + color-scheme 정리
+  function cleanBody() {
     const body = document.body;
-    // 아직 body가 없으면 그냥 return
     if (!body) return;
-
     if (body.classList.contains("is-darkmode")) {
-      // 붙어 있으면 제거
       body.classList.remove("is-darkmode");
-    } else {
-      // 이미 제거돼서 없는 상태라면, 더 이상 interval 돌 필요 없음
-      clearInterval(intervalId);
+    }
+    if (body.style.colorScheme && body.style.colorScheme !== "light") {
+      body.style.colorScheme = "light";
     }
   }
+
+  // 즉시 실행
+  cleanBody();
+  injectLightColorScheme();
+
+  // 8) MutationObserver — body class 변경 및 동적 스타일시트 감시
+  function startObserver() {
+    const body = document.body;
+    if (!body) return;
+
+    new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (
+          m.type === "attributes" &&
+          m.attributeName === "class" &&
+          body.classList.contains("is-darkmode")
+        ) {
+          body.classList.remove("is-darkmode");
+        }
+      }
+    }).observe(body, { attributes: true, attributeFilter: ["class"] });
+
+    new MutationObserver((mutations) => {
+      let needsClean = false;
+      for (const m of mutations) {
+        for (const node of m.addedNodes) {
+          if (
+            node.tagName === "STYLE" ||
+            node.tagName === "LINK"
+          ) {
+            needsClean = true;
+          }
+          if (
+            node.tagName === "META" &&
+            node.getAttribute?.("name") === "color-scheme"
+          ) {
+            sanitizeColorSchemeMeta();
+          }
+        }
+      }
+      if (needsClean) {
+        setTimeout(deleteDarkMediaRules, 50);
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
+
+  // 9) DOMContentLoaded 시점에 전체 정리
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      cleanBody();
+      injectLightColorScheme();
+      sanitizeColorSchemeMeta();
+      deleteDarkMediaRules();
+      startObserver();
+    });
+  } else {
+    cleanBody();
+    injectLightColorScheme();
+    sanitizeColorSchemeMeta();
+    deleteDarkMediaRules();
+    startObserver();
+  }
+
+  // 10) 안전망 — 늦게 로드되는 스크립트 대비 재정리
+  setTimeout(() => {
+    cleanBody();
+    deleteDarkMediaRules();
+    sanitizeColorSchemeMeta();
+  }, 1000);
+
+  setTimeout(() => {
+    cleanBody();
+    deleteDarkMediaRules();
+  }, 3000);
 })();

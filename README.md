@@ -14,7 +14,7 @@
 
 1. 이 저장소를 클론합니다.
    ```bash
-   git clone https://github.com/gyu-young-park/bright-naver-dictionary-chrome-extension.git
+   git clone https://github.com/jujumilk3/bright-naver-dictionary-chrome-extension
    ```
 2. Chrome 주소창에 `chrome://extensions`를 입력합니다.
 3. 우측 상단의 **개발자 모드**를 활성화합니다.
